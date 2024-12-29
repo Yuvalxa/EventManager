@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30523.141
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventManager", "EventManager\EventManager.csproj", "{659C416A-399F-45EE-A434-A780BEC9627A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SensorServerApi", "SensorServer\SensorServerApi.csproj", "{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Debug|x64.ActiveCfg = Debug|x64
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Debug|x64.Build.0 = Debug|x64
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Release|x64.ActiveCfg = Release|x64
+		{659C416A-399F-45EE-A434-A780BEC9627A}.Release|x64.Build.0 = Release|x64
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Debug|x64.ActiveCfg = Debug|x64
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Debug|x64.Build.0 = Debug|x64
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Release|x64.ActiveCfg = Release|x64
+		{AA45A09D-DA9B-4A7E-A174-29A4AB53CB15}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AAE623E5-3B8A-424E-8D57-DC190BDD51BD}
+	EndGlobalSection
+EndGlobal
