@@ -42,18 +42,6 @@ namespace EventManger.Services
 
         }
 
-        private void ScheduleExpiry(string sensorId, TimeSpan delay)
-        {
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(delay);
-                if (_statuses.TryRemove(sensorId, out var removedStatus))
-                {
-                    OnSensorStatusUpdate.OnNext((OperationType.Remove, removedStatus, null));
-                }
-            });
-        }
-
         public async Task DeleteStatus(Guid sensorId)
         {
             Sensor sensor = await _sensorServer.GetSensorById(sensorId);
@@ -71,13 +59,13 @@ namespace EventManger.Services
             await _sensorServer.StopServer();
             _sensorServer.OnSensorStatusEvent -= _sensorServer_OnSensorStatusEvent;
         }
-
+        /// Event handler for processing incoming sensor status events.
         private async void _sensorServer_OnSensorStatusEvent(SensorStatus sensorStatus)
         {
             Console.WriteLine($"got {sensorStatus.SensorId}");
             await Task.Run(() => _sensorsQueue.Enqueue(sensorStatus));
         }
-
+        /// Processes the queue of sensor status updates.
         private async Task ProcessQueue()
         {
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
@@ -104,7 +92,7 @@ namespace EventManger.Services
                 }
             }
         }
-
+        /// Handles a sensor status by updating or adding it to the dictionary and notifying subscribers.
         private async Task HandleSensorStatus(SensorStatus sensorStatus)
         {
             Sensor sensor = await _sensorServer.GetSensorById(sensorStatus.SensorId);
@@ -124,6 +112,19 @@ namespace EventManger.Services
             }
             ScheduleExpiry(sensor.Name, expiryTime);
             OnSensorStatusUpdate.OnNext((operationType, sensorStatus, sensor));
+        }
+
+        /// Schedules the expiry of a sensor status after a specified delay.
+        private void ScheduleExpiry(string sensorId, TimeSpan delay)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(delay);
+                if (_statuses.TryRemove(sensorId, out var removedStatus))
+                {
+                    OnSensorStatusUpdate.OnNext((OperationType.Remove, removedStatus, null));
+                }
+            });
         }
     }
 }
