@@ -16,9 +16,10 @@ namespace EventManger.Services
     {
         private ISensorServer _sensorServer;
         private ConcurrentDictionary<string, SensorStatus> _statuses; // Store statuses with expiry time
-        private ConcurrentQueue<SensorStatus> _sensorsQueue;
         public readonly Subject<(OperationType operationType, SensorStatus sensorStatus, Sensor sensor)> OnSensorStatusUpdate;
         private CancellationTokenSource _cancellationTokenSource;
+        private SemaphoreSlim _semaphore;
+        
 
         [InjectionMethod]
         public void Inject(ISensorServer sensorServer)
@@ -30,16 +31,14 @@ namespace EventManger.Services
         {
             _statuses = new ConcurrentDictionary<string, SensorStatus>();
             OnSensorStatusUpdate = new Subject<(OperationType operationType, SensorStatus sensorStatus, Sensor sensor)>();
-            _sensorsQueue = new ConcurrentQueue<SensorStatus>();
             _cancellationTokenSource = new CancellationTokenSource();
+            _semaphore = new SemaphoreSlim(1, 1); // Allow one thread at a time
         }
 
         public async Task Start()
         {
             _sensorServer.OnSensorStatusEvent += _sensorServer_OnSensorStatusEvent;
             await _sensorServer.StartServer(Rate.Hardcore, isContinuous: true);
-            _ = Task.Run(ProcessQueue, _cancellationTokenSource.Token); 
-
         }
 
         public async Task DeleteStatus(Guid sensorId)
@@ -63,30 +62,14 @@ namespace EventManger.Services
         private async void _sensorServer_OnSensorStatusEvent(SensorStatus sensorStatus)
         {
             Console.WriteLine($"got {sensorStatus.SensorId}");
-            await Task.Run(() => _sensorsQueue.Enqueue(sensorStatus));
-        }
-        /// Processes the queue of sensor status updates.
-        private async Task ProcessQueue()
-        {
-            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            await _semaphore.WaitAsync(); // Wait for access
+            try
             {
-                try
-                {
-                    while (_sensorsQueue.TryDequeue(out var sensorStatus))
-                    {
-                        await HandleSensorStatus(sensorStatus);
-                    }
-                    await Task.Delay(100); // Wait until there's an item in the queue
-                }
-                catch (OperationCanceledException)
-                {
-                    // Graceful cancellation if needed
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error processing queue: {ex.Message}");
-                }
+                await HandleSensorStatus(sensorStatus);
+            }
+            finally
+            {
+                _semaphore.Release(); // Release access
             }
         }
         /// Handles a sensor status by updating or adding it to the dictionary and notifying subscribers.
