@@ -72,14 +72,11 @@ namespace EventManger.Services
             {
                 try
                 {
-                    if (_sensorsQueue.TryDequeue(out var sensorStatus))
+                    while (_sensorsQueue.TryDequeue(out var sensorStatus))
                     {
-                         await HandleSensorStatus(sensorStatus);
+                        await HandleSensorStatus(sensorStatus);
                     }
-                    else
-                    {
-                        await Task.Delay(100); // Avoid tight loop when queue is empty
-                    }
+                    await Task.Delay(100); // Wait until there's an item in the queue
                 }
                 catch (OperationCanceledException)
                 {
