@@ -44,6 +44,7 @@ namespace EventManger.ViewModels
                 .Subscribe(HandleSensorStatusFromMainService);
 
             _mainService.Start().Wait();
+
         }
 
         private void HandleSensorStatusFromMainService((OperationType operationType, SensorStatus sensorStatus, Sensor sensor) update)
@@ -72,6 +73,7 @@ namespace EventManger.ViewModels
             if (!SensorStatuses.Contains(sensorStatusVm))
             {
                 SensorStatuses.Add(sensorStatusVm);
+                SortSensorStatuses();
             }
             else
             {
@@ -81,11 +83,16 @@ namespace EventManger.ViewModels
 
         private void _updateStatus(SensorStatusVm sensorStatusVm)
         {
-            if (SensorStatuses.Contains(sensorStatusVm))
+            var existingItem = SensorStatuses.FirstOrDefault(s => s.Equals(sensorStatusVm));
+            if (existingItem != null)
             {
-                _removeStatus(sensorStatusVm);
+                var index = SensorStatuses.IndexOf(existingItem);
+                SensorStatuses[index] = sensorStatusVm;
             }
-            _insertStatus(sensorStatusVm);
+            else
+            {
+                _insertStatus(sensorStatusVm);
+            }
         }
 
         private void _removeStatus(SensorStatusVm sensorStatusVm)
@@ -94,6 +101,29 @@ namespace EventManger.ViewModels
             {
                 SensorStatuses.Remove(sensorStatusVm);
             }
+        }
+        private void SortSensorStatuses()
+        {
+            var sortedList = SensorStatuses.OrderBy(s => ExtractSensorNumber(s.SensorName)).ToList();
+            SensorStatuses.Clear();
+            foreach (var item in sortedList)
+            {
+                SensorStatuses.Add(item);
+            }
+        }
+
+        private int ExtractSensorNumber(string sensorName)
+        {
+            if (string.IsNullOrWhiteSpace(sensorName)) return int.MaxValue;
+
+            // Extract the numeric part of "Sensor {num}"
+            var match = System.Text.RegularExpressions.Regex.Match(sensorName, @"\d+");
+            if (match.Success && int.TryParse(match.Value, out int number))
+            {
+                return number;
+            }
+
+            return int.MaxValue; // Fallback for invalid or non-numeric names
         }
     }
 }
