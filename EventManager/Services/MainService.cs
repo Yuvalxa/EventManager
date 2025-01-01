@@ -1,12 +1,11 @@
-﻿using EventManger.AlarmLogic;
-using EventManger.Enums;
+﻿using EventManger.Enums;
 using SensorServerApi;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Unity;
@@ -16,10 +15,10 @@ namespace EventManger.Services
     public class MainService
     {
         private ISensorServer _sensorServer;
-        //List<SensorStatus> _statuses;
-        private ConcurrentDictionary<Guid, SensorStatus> _statuses; // Thread-safe diconary to hold sensor statuses
-
-        public Subject<(OperationType operationType, SensorStatus sensorStatus, Sensor sensor)> OnSensorStatusUpdate;
+        private ConcurrentDictionary<string, SensorStatus> _statuses; // Store statuses with expiry time
+        private ConcurrentQueue<SensorStatus> _sensorsQueue;
+        public readonly Subject<(OperationType operationType, SensorStatus sensorStatus, Sensor sensor)> OnSensorStatusUpdate;
+        private CancellationTokenSource _cancellationTokenSource;
 
         [InjectionMethod]
         public void Inject(ISensorServer sensorServer)
@@ -29,55 +28,102 @@ namespace EventManger.Services
 
         public MainService()
         {
-            _statuses = new ConcurrentDictionary<Guid, SensorStatus>();
+            _statuses = new ConcurrentDictionary<string, SensorStatus>();
             OnSensorStatusUpdate = new Subject<(OperationType operationType, SensorStatus sensorStatus, Sensor sensor)>();
+            _sensorsQueue = new ConcurrentQueue<SensorStatus>();
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
         public async Task Start()
         {
             _sensorServer.OnSensorStatusEvent += _sensorServer_OnSensorStatusEvent;
-            await _sensorServer.StartServer(Rate.Easy, isContinuous: true);
+            await _sensorServer.StartServer(Rate.Medium, isContinuous: true);
+            await Task.Run(ProcessQueue, _cancellationTokenSource.Token);
+
         }
 
-        public Task DeleteStatus(Guid sensorId)
+        private void ScheduleExpiry(string sensorId, TimeSpan delay)
         {
-            return Task.Run(() => {
-                if(_statuses.TryGetValue(sensorId, out SensorStatus sensorStatus))
-                    _statuses.TryRemove(sensorStatus.Id,out _);
-                    OnSensorStatusUpdate.OnNext((operationType: OperationType.Remove, sensorStatus: sensorStatus, sensor: null));
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(delay);
+                if (_statuses.TryRemove(sensorId, out var removedStatus))
+                {
+                    OnSensorStatusUpdate.OnNext((OperationType.Remove, removedStatus, null));
+                }
             });
         }
 
+        public async Task DeleteStatus(Guid sensorId)
+        {
+            Sensor sensor = await _sensorServer.GetSensorById(sensorId);
+            await Task.Run(() => {
+                if (_statuses.TryGetValue(sensor.Name, out SensorStatus sensorStatus))
+                {
+                    _statuses.TryRemove(sensor.Name, out _);
+                    OnSensorStatusUpdate.OnNext((operationType: OperationType.Remove, sensorStatus: sensorStatus, sensor: null));
+                }
+            });
+        }
+        //TODO: add stop logic if needed
         public async Task Stop()
         {
-            // Add code to stop the service .. 
             await _sensorServer.StopServer();
+            _sensorServer.OnSensorStatusEvent -= _sensorServer_OnSensorStatusEvent;
         }
 
         private async void _sensorServer_OnSensorStatusEvent(SensorStatus sensorStatus)
         {
-            // Handle status from server ...
             Console.WriteLine($"got {sensorStatus.SensorId}");
-            Sensor sensor = await _sensorServer.GetSensorById(sensorStatus.SensorId);
+            await Task.Run(() => _sensorsQueue.Enqueue(sensorStatus));
+        }
 
-            OperationType operationType;
-           if(!_statuses.TryGetValue(sensorStatus.Id,out SensorStatus oldstatus))
+        private async Task ProcessQueue()
+        {
+            while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
-                operationType = OperationType.Add;
+                try
+                {
+                    if (_sensorsQueue.TryDequeue(out var sensorStatus))
+                    {
+                         await HandleSensorStatus(sensorStatus);
+                    }
+                    else
+                    {
+                        await Task.Delay(100); // Avoid tight loop when queue is empty
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Graceful cancellation if needed
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing queue: {ex.Message}");
+                }
             }
-            else
+        }
+
+        private async Task HandleSensorStatus(SensorStatus sensorStatus)
+        {
+            Sensor sensor = await _sensorServer.GetSensorById(sensorStatus.SensorId);
+            var expiryTime = sensorStatus.TimeStamp.AddSeconds(15).TimeOfDay - sensorStatus.TimeStamp.TimeOfDay; // Set expiry time ( 15 sec after reciveTime) 
+            OperationType operationType;
+            if (_statuses.TryGetValue(sensor.Name, out var oldStatus)) // Update Operation
             {
                 operationType = OperationType.Update;
-                _statuses.TryRemove(oldstatus.Id, out _);
+                _statuses[sensor.Name] = sensorStatus; // UpdateStatus
+                Console.WriteLine($"Update - {sensorStatus.SensorId} , {sensor.Name}");
             }
-
-            _statuses.TryAdd(sensorStatus.Id, sensorStatus);
-
-
-            Console.WriteLine($"added {sensorStatus.SensorId}, {sensor.Name} to dictionary");
-
-            // update ui
-            OnSensorStatusUpdate.OnNext((operationType: operationType, sensorStatus: sensorStatus, sensor: sensor));
+            else // if not exits Add Opration
+            {
+                operationType = OperationType.Add;
+                Console.WriteLine($"Add - {sensorStatus.SensorId}, {sensor.Name}");
+                _statuses.TryAdd(sensor.Name, sensorStatus);
+            }
+            ScheduleExpiry(sensor.Name, expiryTime);
+            OnSensorStatusUpdate.OnNext((operationType, sensorStatus, sensor));
         }
     }
 }
