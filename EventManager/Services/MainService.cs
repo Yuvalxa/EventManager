@@ -37,8 +37,8 @@ namespace EventManger.Services
         public async Task Start()
         {
             _sensorServer.OnSensorStatusEvent += _sensorServer_OnSensorStatusEvent;
-            await _sensorServer.StartServer(Rate.Medium, isContinuous: true);
-            await Task.Run(ProcessQueue, _cancellationTokenSource.Token);
+            await _sensorServer.StartServer(Rate.Hardcore, isContinuous: true);
+            _ = Task.Run(ProcessQueue, _cancellationTokenSource.Token); 
 
         }
 
